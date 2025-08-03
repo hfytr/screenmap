@@ -1,0 +1,6 @@
+pgdata/
+screenmap/target/
+screenmap/.nvim
+screenmap/.sass-cache
+process_csv/target
+process_csv/test.csv
