@@ -1,5 +1,4 @@
 #![feature(iterator_try_collect)]
-pub mod components;
 pub mod app;
 pub mod interface;
 pub mod server;
