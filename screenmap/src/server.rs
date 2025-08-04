@@ -63,7 +63,7 @@ pub async fn cys_location(cys_query: CysQuery) -> ServerFnResult<i64> {
 }
 
 #[server(name = Search, prefix = "/api")]
-pub async fn search(query: String) -> ServerFnResult<Vec<String>> {
+pub async fn search_tbls(query: String) -> ServerFnResult<Vec<String>> {
     use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
     let state = AppState::from_cx()?;
     let tbls = get_tbls(&state).await?;
@@ -97,7 +97,7 @@ pub async fn search_table(
     if !get_tbls(&state).await?.contains(&tbl_name) {
         return Err(ServerFnError::new("Nice try."));
     } else if query.is_empty() {
-        return Ok(vec![0..=(get_num_rows(tbl_name).await? - 1)]);
+        return Ok(vec![1..=get_num_rows(tbl_name).await?]);
     }
     let columns = get_screen_keys(tbl_name.clone()).await?;
     let where_clause = columns
@@ -171,7 +171,7 @@ pub async fn get_rows(
     );
     let mut query = sqlx::query(&query_str);
     for id in rows.iter() {
-        query = query.bind(1 + *id as i32);
+        query = query.bind(*id as i32);
     }
 
     let fetched_rows = query.fetch_all(&*state.pool).await?;

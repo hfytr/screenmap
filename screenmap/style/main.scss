@@ -1,7 +1,156 @@
-/* Global styles */
 html, body {
     height: 100%;
     margin: 0;
     padding: 0;
+    overflow: auto;
+}
+
+.search-tables-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+/* Style for both search inputs */
+.search-input {
+    padding: 0.5rem 1rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    outline: none;
+    transition: all 0.3s ease;
+    box-sizing: border-box;
+    min-width: 250px;
+}
+
+.search-input:focus {
+    border-color: #42b883;
+    box-shadow: 0 0 5px rgba(66, 184, 131, 0.3);
+}
+
+/* Table search wrapper */
+.table-search-wrapper {
+    position: relative;
+}
+
+/* In-table search wrapper */
+.in-table-search-wrapper {
+    position: relative;
+}
+
+.in-table-search {
+    position: relative;
+    margin-left: auto; /* This pushes it to the right */
+}
+
+.search-header {
+    display: flex;
+    justify-content: space-between; /* This will push elements to opposite sides */
+    align-items: center;
+    margin-bottom: 15px;
+    width: 100%;
+    gap: 20px;
+}
+
+/* Unified control styling */
+.generic-box {
+    padding: 0 1.5rem; /* Horizontal padding only */
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    outline: none;
+    transition: all 0.3s ease;
+    box-sizing: border-box;
+    min-width: 100px;
+    height: 30px;
+    line-height: 30px; /* Matches height for perfect vertical centering */
+    text-align: center; /* Centers text horizontally */
+    display: inline-flex; /* Changed to inline-flex */
+    align-items: center;
+    justify-content: center; /* Centers content horizontally */
+    vertical-align: middle; /* Fixes alignment in inline contexts */
+}
+
+.generic-box:focus {
+    border-color: #42b883;
+    box-shadow: 0 0 5px rgba(66, 184, 131, 0.3);
+}
+
+.search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    max-height: 300px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    margin-top: 5px;
+    z-index: 101;
     overflow: hidden;
+}
+
+.search-result-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.search-result-item:hover {
+    background-color: #f5f5f5;
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+/* Table viewport */
+.table-viewport {
+    width: 100%;
+}
+
+/* Table controls */
+.table-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    width: 100%;
+}
+
+.page-indicator {
+    flex-grow: 1;
+    text-align: center;
+}
+
+/* Table container */
+.scroll-container {
+    overflow-x: auto;
+    width: 100%;
+}
+
+.bordered-table {
+    border-collapse: collapse;
+    width: 100%;
+    table-layout: auto;
+}
+
+.bordered-table th, 
+.bordered-table td {
+    border: 1px solid #ddd;
+    padding: 8px 12px;
+    white-space: nowrap;
+}
+
+.bordered-table th {
+    background-color: #f2f2f2;
+    text-align: left;
+    position: sticky;
+    top: 0;
 }

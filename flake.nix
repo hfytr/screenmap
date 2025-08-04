@@ -31,6 +31,7 @@
             leptosfmt
             sass
             postgresql
+            binaryen
           ];
           LD_LIBRARY_PATH = "${lib.makeLibraryPath nativeBuildInputs}";
           RUST_BACKTRACE = 1;
