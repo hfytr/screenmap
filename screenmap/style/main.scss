@@ -5,15 +5,19 @@ html, body {
     overflow: auto;
 }
 
+.app-container {
+    height: 100%;
+}
+
 .search-tables-container {
     display: flex;
     flex-direction: column;
     width: 100%;
+    height: 100%;
     padding: 20px;
     box-sizing: border-box;
 }
 
-/* Style for both search inputs */
 .search-input {
     padding: 0.5rem 1rem;
     border: 1px solid #ddd;
@@ -30,33 +34,30 @@ html, body {
     box-shadow: 0 0 5px rgba(66, 184, 131, 0.3);
 }
 
-/* Table search wrapper */
 .table-search-wrapper {
     position: relative;
 }
 
-/* In-table search wrapper */
 .in-table-search-wrapper {
     position: relative;
 }
 
 .in-table-search {
     position: relative;
-    margin-left: auto; /* This pushes it to the right */
+    margin-left: auto;
 }
 
 .search-header {
     display: flex;
-    justify-content: space-between; /* This will push elements to opposite sides */
+    justify-content: space-between;
     align-items: center;
     margin-bottom: 15px;
     width: 100%;
     gap: 20px;
 }
 
-/* Unified control styling */
 .generic-box {
-    padding: 0 1.5rem; /* Horizontal padding only */
+    padding: 0 1.5rem;
     border: 1px solid #ddd;
     border-radius: 4px;
     font-size: 1rem;
@@ -65,12 +66,12 @@ html, body {
     box-sizing: border-box;
     min-width: 100px;
     height: 30px;
-    line-height: 30px; /* Matches height for perfect vertical centering */
-    text-align: center; /* Centers text horizontally */
-    display: inline-flex; /* Changed to inline-flex */
+    line-height: 30px;
+    text-align: center;
+    display: inline-flex;
     align-items: center;
-    justify-content: center; /* Centers content horizontally */
-    vertical-align: middle; /* Fixes alignment in inline contexts */
+    justify-content: center;
+    vertical-align: middle;
 }
 
 .generic-box:focus {
@@ -110,12 +111,15 @@ html, body {
     border-bottom: none;
 }
 
-/* Table viewport */
 .table-viewport {
     width: 100%;
+    height: 100%;
+    min-height: 300px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
-/* Table controls */
 .table-controls {
     display: flex;
     justify-content: space-between;
@@ -129,7 +133,6 @@ html, body {
     text-align: center;
 }
 
-/* Table container */
 .scroll-container {
     overflow-x: auto;
     width: 100%;
@@ -153,4 +156,20 @@ html, body {
     text-align: left;
     position: sticky;
     top: 0;
+}
+
+.logo-container {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    height: 100%;
+    display: flex;
+    align-items: center;
+    pointer-events: none;
+}
+
+.logo {
+    height: 40px;
+    width: auto;
+    max-width: 200px;
 }

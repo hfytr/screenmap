@@ -1,5 +1,5 @@
 use crate::server::{get_rows, get_screen_keys, search_table, search_tbls};
-use leptos_use::{use_event_listener, on_click_outside};
+use leptos_use::{on_click_outside, use_resize_observer};
 use leptos::{
     html::Div, logging::{error, log}, prelude::*, reactive::signal::signal
 };
@@ -48,12 +48,31 @@ pub fn App() -> impl IntoView {
 fn SearchTables() -> impl IntoView {
     let (screen_name, set_screen_name) = signal(None);
     let (search_query, set_search_query) = signal("".to_string());
-    let matches = LocalResource::new(move || search_tbls(search_query()));
     let (query, set_query) = signal(None);
     let (is_search_focused, set_is_search_focused) = signal(false);
+    let (page_size, set_page_size) = signal(10);
 
     let search_container_ref = NodeRef::<Div>::new();
+    let table_viewport_ref = NodeRef::<Div>::new();
 
+    let _ = on_click_outside(
+        search_container_ref,
+        move |_| set_is_search_focused(false),
+    );
+    let _ = use_resize_observer(
+        table_viewport_ref,
+        move |entries, _| {
+            if let Some(entry) = entries.first() {
+                let height = entry.content_rect().height();
+                log!("h: {}", height);
+                let new_page_size = (height / 40.0).floor() as usize;
+                set_page_size.set(new_page_size.max(1)); // Ensure at least 1 row
+            }
+        }
+    );
+    
+
+    let matches = LocalResource::new(move || search_tbls(search_query()));
     let search_matches = move || {
         matches
             .get()
@@ -80,10 +99,6 @@ fn SearchTables() -> impl IntoView {
             .into_any()
     };
 
-    let _ = on_click_outside(
-        search_container_ref,
-        move |_| set_is_search_focused(false),
-    );
     view! {
         <div class="search-tables-container">
             <div class="search-header">
@@ -107,25 +122,26 @@ fn SearchTables() -> impl IntoView {
                         </div>
                     </Show>
                 </div>
-                <Show when=move || screen_name().is_some()>
-                    <div class="in-table-search">
-                        <input
-                            type="text"
-                            class="generic-box"
-                            placeholder="Search in table..."
-                            prop:value=query
-                            on:input=move |ev| {
-                                let text = event_target_value(&ev);
-                                set_query(Some(text));
-                            }
-                        />
-                    </div>
-                </Show>
+                <div class="logo-container">
+                    <img src="/logo.webp" alt="Logo" class="logo"/>
+                </div>
+                <div class="in-table-search">
+                    <input
+                        type="text"
+                        class="generic-box"
+                        placeholder="Search in table..."
+                        prop:value=query
+                        on:input=move |ev| {
+                            let text = event_target_value(&ev);
+                            set_query(Some(text));
+                        }
+                    />
+                </div>
             </div>
 
-            <div class="table-viewport">
+            <div class="table-viewport" node_ref=table_viewport_ref>
                 <Show when=move || screen_name().is_some() fallback=|| view! {}.into_view()>
-                    <Table screen_name query/>
+                    <Table screen_name query page_size/>
                 </Show>
             </div>
         </div>
@@ -136,6 +152,7 @@ fn SearchTables() -> impl IntoView {
 fn Table(
     screen_name: ReadSignal<Option<String>>,
     query: ReadSignal<Option<String>>,
+    page_size: ReadSignal<usize>,
 ) -> impl IntoView {
     let screen_keys = Resource::new(
         move || screen_name,
@@ -152,7 +169,6 @@ fn Table(
         let _ = query.get();
         set_cur_page(0);
     });
-    const PAGE_SIZE: usize = 10;
     let known_rows = RwSignal::new(BTreeMap::<_, BTreeMap<String, String>>::new());
     let rows_getter = Resource::new(
         move || {
@@ -161,13 +177,14 @@ fn Table(
                 cur_page.get(),
                 screen_name.get(),
                 known_rows.get(),
+                page_size.get(),
             )
         },
-        move |(query, cur_page, screen_name, known_rows)| async move {
+        move |(query, cur_page, screen_name, known_rows, page_size)| async move {
             let query = query.unwrap_or_default();
             let screen_name = screen_name.ok_or(String::from("No screen name."))?;
-            let start = cur_page * PAGE_SIZE + 1;
-            let end = start + PAGE_SIZE;
+            let start = cur_page * page_size + 1;
+            let end = start + page_size;
             let mut rows_to_view = vec![];
             let ranges = search_table(screen_name.clone(), query)
                 .await
@@ -306,14 +323,14 @@ fn Table(
                     <span class="page-indicator">{ move ||
                         format!(
                             "Showing {} - {} of {}",
-                            cur_page.get() * PAGE_SIZE + 1,
-                            std::cmp::min((cur_page.get() + 1) * PAGE_SIZE, num_rows.get()),
+                            cur_page.get() * page_size.get() + 1,
+                            std::cmp::min((cur_page.get() + 1) * page_size.get(), num_rows.get()),
                             num_rows.get()
                         )
                     }</span>
                     <button
                         on:click=move |_| set_cur_page.update(|p| *p += 1)
-                        disabled=move || { (cur_page.get() + 1) * PAGE_SIZE >= num_rows.get() }
+                        disabled=move || { (cur_page.get() + 1) * page_size.get() >= num_rows.get() }
                         class="generic-box"
                     >
                         "Next"
