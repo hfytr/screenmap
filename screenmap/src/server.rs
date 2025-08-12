@@ -1,6 +1,6 @@
-use crate::interface::{ColType, CysQuery, ScreenmapRow};
+use crate::interface::{ColType, CysQuery, DataCell};
 use leptos::{prelude::ServerFnError, server};
-use std::{fmt::Debug, ops::RangeInclusive};
+use std::{collections::BTreeMap, fmt::Debug, ops::RangeInclusive};
 
 type ServerFnResult<T> = Result<T, ServerFnError>;
 
@@ -153,7 +153,7 @@ pub async fn search_table(
 pub async fn get_rows(
     rows: Vec<usize>,
     tbl_name: String,
-) -> ServerFnResult<Vec<(usize, ScreenmapRow)>> {
+) -> ServerFnResult<Vec<(usize, BTreeMap<String, DataCell>)>> {
     if rows.is_empty() {
         return Ok(vec![]);
     }
@@ -182,14 +182,32 @@ pub async fn get_rows(
             screen_keys
                 .clone()?
                 .into_iter()
-                .map(|(col, col_type)| match col_type {
-                    ColType::TEXT => get_col::<String>(&row, col),
-                    ColType::REAL => get_col::<f64>(&row, col),
-                    ColType::DOUBLE => get_col::<f32>(&row, col),
-                    ColType::SMALLINT => get_col::<i16>(&row, col),
-                    ColType::INT => get_col::<i32>(&row, col),
-                    ColType::BIGINT => get_col::<i64>(&row, col),
-                })
+                .map(|(col, col_type, _)| -> ServerFnResult<_> { match col_type {
+                    ColType::TEXT => {
+                        let data = get_col::<String>(&row, col.as_str())?.map(DataCell::Text).unwrap_or_default();
+                        Ok((col, data))
+                    }
+                    ColType::DOUBLE => {
+                        let data = get_col::<f64>(&row, col.as_str())?.map(DataCell::Double).unwrap_or_default();
+                        Ok((col, data))
+                    }
+                    ColType::REAL => {
+                        let data = get_col::<f32>(&row, col.as_str())?.map(|x| DataCell::Double(x as f64)).unwrap_or_default();
+                        Ok((col, data))
+                    }
+                    ColType::BIGINT => {
+                        let data = get_col::<i64>(&row, col.as_str())?.map(DataCell::BigInt).unwrap_or_default();
+                        Ok((col, data))
+                    }
+                    ColType::INT => {
+                        let data = get_col::<i32>(&row, col.as_str())?.map(|x| DataCell::BigInt(x as i64)).unwrap_or_default();
+                        Ok((col, data))
+                    }
+                    ColType::SMALLINT => {
+                        let data = get_col::<i16>(&row, col.as_str())?.map(|x| DataCell::BigInt(x as i64)).unwrap_or_default();
+                        Ok((col, data))
+                    }
+                }})
                 .try_collect()
                 .map(|row| (row_id, row))
         })
@@ -199,15 +217,11 @@ pub async fn get_rows(
 }
 
 #[cfg(feature = "ssr")]
-fn get_col<'b, 'a: 'b, T>(row: &'a PgRow, col: String) -> ServerFnResult<(String, String)>
+fn get_col<'b, 'a: 'b, T>(row: &'a PgRow, col: &str) -> ServerFnResult<Option<T>>
 where
     T: ToString + sqlx::Type<sqlx::Postgres> + sqlx::Decode<'b, sqlx::Postgres> + Debug + Default,
 {
-    let res = row
-        .try_get(col.as_str())
-        .map_err(ServerFnError::new)
-        .map(|t: Option<T>| (col.clone(), t.unwrap_or_default().to_string()));
-    res
+    row.try_get(col).map_err(ServerFnError::new)
 }
 
 #[cfg(feature = "ssr")]
@@ -227,7 +241,7 @@ async fn get_tbls(state: &AppState) -> ServerFnResult<Vec<String>> {
 }
 
 #[server(name = ScreenKeys, prefix = "/api")]
-pub async fn get_screen_keys(screen_name: String) -> ServerFnResult<Vec<(String, ColType)>> {
+pub async fn get_screen_keys(screen_name: String) -> ServerFnResult<Vec<(String, ColType, Option<(f64, f64)>)>> {
     let state = AppState::from_cx()?;
     get_screen_keys_inner(&screen_name, &state).await
 }
@@ -236,8 +250,8 @@ pub async fn get_screen_keys(screen_name: String) -> ServerFnResult<Vec<(String,
 async fn get_screen_keys_inner(
     screen_name: &str,
     state: &AppState,
-) -> ServerFnResult<Vec<(String, ColType)>> {
-    sqlx::query(
+) -> ServerFnResult<Vec<(String, ColType, Option<(f64, f64)>)>> {
+    let columns = sqlx::query(
         r#"
         SELECT column_name, data_type
         FROM information_schema.columns
@@ -253,7 +267,66 @@ async fn get_screen_keys_inner(
             ColType::from_str(&row.try_get::<String, _>("data_type")?).unwrap_or(ColType::TEXT),
         ))
     })
-    .fetch_all(state.pool.as_ref())
-    .await
-    .map_err(ServerFnError::new)
+    .fetch_all(&*state.pool)
+    .await?;
+
+    let double_columns: Vec<&str> = columns
+        .iter()
+        .filter(|(_, col_type)| *col_type == ColType::DOUBLE)
+        .map(|(name, _)| name.as_str())
+        .collect();
+
+    let mut min_max_map = BTreeMap::new();
+    if !double_columns.is_empty() {
+        let selects: Vec<String> = double_columns
+            .iter()
+            .map(|col| {
+                // Sanitize column name for alias generation
+                let alias_safe = col.replace('\"', "_");
+                format!(
+                    "min(\"{col}\") as \"min_{alias_safe}\", max(\"{col}\") as \"max_{alias_safe}\"",
+                    col = col.replace('\"', "\"\"")
+                )
+            })
+            .collect();
+
+        let query_str = format!(
+            "SELECT {} FROM \"{}\"",
+            selects.join(", "),
+            screen_name.replace('\"', "\"\"")
+        );
+
+        match sqlx::query(&query_str)
+            .fetch_one(state.pool.as_ref())
+            .await
+        {
+            Ok(row) => {
+                for col in &double_columns {
+                    // Use the same sanitized alias when retrieving
+                    let alias_safe = col.replace('\"', "_");
+                    let min: f64 = row.try_get(format!("min_{}", alias_safe).as_str())?;
+                    let max: f64 = row.try_get(format!("max_{}", alias_safe).as_str())?;
+
+                    min_max_map.insert(*col, (min, max));
+                }
+            }
+            Err(e) => {
+                dbg!(&e);
+            }
+        }
+    }
+
+    let result = columns
+        .iter()
+        .map(|(col_name, col_type)| {
+            let min_max = if *col_type == ColType::DOUBLE || *col_type == ColType::BIGINT {
+                min_max_map.get(col_name.as_str()).copied()
+            } else {
+                None
+            };
+            (col_name.clone(), *col_type, min_max)
+        })
+        .collect();
+
+    Ok(result)
 }

@@ -1,8 +1,16 @@
-use std::collections::BTreeMap;
-
 use serde::{Deserialize, Serialize};
 
-pub type ScreenmapRow = BTreeMap<String, String>;
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub enum DataCell {
+    Double(f64),
+    BigInt(i64),
+    Text(String),
+    Null,
+}
+
+impl Default for DataCell {
+    fn default() -> Self { return Self::Null }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CysQuery {
@@ -10,19 +18,7 @@ pub struct CysQuery {
     pub screen_name: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum WSQuery {
-    SetScreen(String),
-    QueryRow((usize, String)),
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum WSResponse {
-    Confirm(String),
-    RespondRow((ScreenmapRow, usize)),
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq)]
 pub enum ColType {
     SMALLINT = 0,
     INT = 1,
@@ -32,6 +28,7 @@ pub enum ColType {
     TEXT = 5,
 }
 
+
 impl ColType {
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
@@ -39,7 +36,7 @@ impl ColType {
             "integer" => Some(ColType::INT),
             "bigint" => Some(ColType::BIGINT),
             "real" => Some(ColType::REAL),
-            "double" => Some(ColType::DOUBLE),
+            "double precision" => Some(ColType::DOUBLE),
             "text" => Some(ColType::TEXT),
             _ => None,
         }

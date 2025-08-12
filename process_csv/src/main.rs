@@ -9,27 +9,22 @@ use std::{env, process::exit};
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
 enum RecordType {
     // rank by MAX - MIN
-    SMALLINT = 0,
-    INT = 1,
-    BIGINT = 2,
-    REAL = 3,
-    DOUBLE = 4,
-    TEXT = 5,
+    BIGINT = 0,
+    DOUBLE = 1,
+    TEXT = 2,
 }
 
 impl Display for RecordType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RecordType::SMALLINT => f.write_str("SMALLINT"),
-            RecordType::INT => f.write_str("INT"),
             RecordType::BIGINT => f.write_str("BIGINT"),
-            RecordType::REAL => f.write_str("REAL"),
-            RecordType::DOUBLE => f.write_str("DOUBLE"),
+            RecordType::DOUBLE => f.write_str("DOUBLE PRECISION"),
             RecordType::TEXT => f.write_str("TEXT"),
         }
     }
 }
 
+#[derive(Debug)]
 struct Args {
     pub fpath: PathBuf,
     pub force: bool,
@@ -112,20 +107,13 @@ impl CSVProcessor {
                 eprintln!("WARNING: Error parsing csv on line {}: {:?}", i + 1, e);
             } else if let Ok(row) = maybe_row {
                 for (maybe_header_type, item) in header_types.iter_mut().zip(row.iter()) {
-                    let smallest_type = if let Ok(x) = str::parse::<i64>(item) {
-                        if x < i16::MAX.into() && x > i16::MIN.into() {
-                            RecordType::SMALLINT
-                        } else if x < i32::MAX.into() && x > i32::MIN.into() {
-                            RecordType::INT
-                        } else {
-                            RecordType::BIGINT
-                        }
-                    } else if let Ok(x) = str::parse::<f64>(item) {
-                        if x < f32::MAX.into() && x > f32::MIN.into() {
-                            RecordType::REAL
-                        } else {
+                    if item.is_empty() {
+                        continue;
+                    }
+                    let smallest_type = if str::parse::<i64>(item).is_ok() {
+                        RecordType::BIGINT
+                    } else if str::parse::<f64>(item).is_ok() {
                             RecordType::DOUBLE
-                        }
                     } else {
                         RecordType::TEXT
                     };
@@ -162,6 +150,10 @@ impl CSVProcessor {
             .ok_or(Error::msg("ERROR: Failed converting OsStr to string"))?
             .validate()
             .to_ascii_lowercase();
+        if table_name.len() > 63 {
+            eprintln!("ERROR: table name \"{table_name}\" has length greater than 63, which is the max allowed by postgrsql.");
+            panic!();
+        }
         Ok(Self {
             table_name,
             columns,
@@ -174,7 +166,7 @@ impl CSVProcessor {
         let pool = PgPool::connect(db_url).await?;
         println!("{}", self.table_name);
         let table_exists = sqlx::query!(
-            "SELECT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = $1)",
+            "SELECT EXISTS (SELECT FROM pg_tables WHERE tablename = $1)",
             self.table_name
         )
         .fetch_one(&pool)
@@ -183,6 +175,7 @@ impl CSVProcessor {
         .exists
         .unwrap();
         println!("{}", table_exists);
+        dbg!(&self.table_name);
         if table_exists {
             if force {
                 let drop_table_q = format!("DROP TABLE {}", self.table_name);
@@ -233,7 +226,9 @@ impl CSVProcessor {
 
 #[tokio::main]
 async fn main() {
+    dbg!("h;i");
     let args = Args::new(env::args().collect());
+    dbg!(&args);
     let err_msg = "ERROR: Set the DATABASE_URL environment variable";
     let db_url = env::var("DATABASE_URL").expect(err_msg);
     let processor = CSVProcessor::new(args.fpath).unwrap();
